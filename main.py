@@ -6,7 +6,7 @@ import time
 from datetime import datetime
 from obs_image import create_obs_image
 
-SHEET_URL = "https://docs.google.com/spreadsheets/d/1m8z5sIElnUFGTBNhCEiscEqK3429PPnf7z-KQ8s5HXc/edit"
+SHEET_URL = "https://docs.google.com/spreadsheets/d/1ZeVVX9UOG8q1Fl_nT5uzFNnEM88Gqb2Wdsq7WYqaJc0/edit"
 
 def get_current_show(sheet_url):
     csv_url = sheet_url.replace('/edit', '/export?format=csv&')
@@ -14,22 +14,25 @@ def get_current_show(sheet_url):
     try:
         df = pd.read_csv(csv_url)
 
+        df['Time'] = pd.to_datetime(df['Time'], format="%H:%M", errors='coerce').dt.time
+        df = df.dropna(subset=['Time'])
+
         now = datetime.now().time()
 
+        current_show = None
+        latest_time = None
+
         for _, row in df.iterrows():
-            try:
-                start_time = datetime.strptime(row['TIME START'], "%H:%M").time()
-                end_time = datetime.strptime(row['TIME END'], "%H:%M").time()
+            show_time = row['Time']
+            if show_time <= now and (latest_time is None or show_time > latest_time):
+                latest_time = show_time
+                current_show = row['Show']
 
-                if start_time <= now <= end_time:
-                    return row['SHOW NAME']
-            except Exception as e:
-                print(f"Skipping row due to error: {e}")
+        return current_show
+
     except Exception as e:
-        print(f"Error reading sheet: {e}")
-
-    return None
-
+        print(f"Error reading or parsing sheet: {e}")
+        return None
 
 def main_loop():
     while True:
@@ -39,16 +42,15 @@ def main_loop():
             if show_name:
                 create_obs_image(show_name)
             else:
-                create_obs_image("You're listening to DCUfm!")
+                create_obs_image("You're watching the 12hr broadcast!")
 
             wait_time = random.randint(30, 45)
             time.sleep(wait_time)
 
         except Exception as e:
             print(f"Error occurred: {e}. Retrying in 5 seconds...")
-            create_obs_image("You're listening to DCUfm!")
+            create_obs_image("You're watching the 12hr broadcast!")
             time.sleep(5)
-
 
 if __name__ == "__main__":
     while True:
